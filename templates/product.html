@@ -10,6 +10,12 @@
         .amazon-orange:hover { background-color: #e0a83f; }
         .amazon-blue { background-color: #131921; }
         .amazon-blue-light { background-color: #232f3e; }
+        .carousel-image { display: none; }
+        .carousel-image.active { display: block; }
+        .thumbnail { cursor: pointer; }
+        .thumbnail.active { border-color: #f0c14b; }
+        .carousel-button { background-color: rgba(0, 0, 0, 0.5); }
+        .carousel-button:hover { background-color: rgba(0, 0, 0, 0.7); }
     </style>
 </head>
 <body class="bg-gray-100 font-sans">
@@ -50,20 +56,34 @@
             </p>
         {% endfor %}
         <div class="bg-white p-6 rounded-lg shadow-sm flex flex-col lg:flex-row">
-            <!-- Galeria de Fotos -->
-            <div class="w-full lg:w-1/2 mb-4 lg:mb-0 lg:mr-6">
+            <!-- Galeria de Fotos (Carrossel) -->
+            <div class="w-full lg:w-1/2 mb-4 lg:mb-0 lg:mr-6 relative">
                 {% if photos %}
-                    <img src="{{ photos[0][0] }}" alt="{{ product[1] }}"
-                         class="w-full h-96 object-contain mb-4">
-                    <div class="flex space-x-2 overflow-x-auto">
+                    <div class="relative">
                         {% for photo in photos %}
                             <img src="{{ photo[0] }}" alt="{{ product[1] }}"
-                                 class="w-20 h-20 object-contain border cursor-pointer hover:border-orange-400">
+                                 class="w-full h-96 object-contain carousel-image {% if loop.first %}active{% endif %}"
+                                 id="carousel-image-{{ loop.index0 }}">
+                        {% endfor %}
+                        <button class="carousel-button absolute left-0 top-1/2 transform -translate-y-1/2 p-2 text-white rounded-full"
+                                onclick="prevImage()">
+                            &larr;
+                        </button>
+                        <button class="carousel-button absolute right-0 top-1/2 transform -translate-y-1/2 p-2 text-white rounded-full"
+                                onclick="nextImage()">
+                            &rarr;
+                        </button>
+                    </div>
+                    <div class="flex space-x-2 mt-4 overflow-x-auto">
+                        {% for photo in photos %}
+                            <img src="{{ photo[0] }}" alt="{{ product[1] }}"
+                                 class="w-20 h-20 object-contain border thumbnail {% if loop.first %}active{% endif %}"
+                                 onclick="showImage({loop,index0})">
                         {% endfor %}
                     </div>
                 {% else %}
                     <img src="{{ url_for('static', filename='uploads/placeholder.png') }}" alt="Sem imagem"
-                         class="w-full h-96 object-contain mb-4">
+                         class="w-full h-96 object-contain">
                 {% endif %}
             </div>
             <!-- Detalhes do Produto -->
@@ -97,5 +117,53 @@
             <p>Contato: <a href="https://wa.me/5511999999999" class="underline">WhatsApp</a> | Email: contato@eletrocommerce.com</p>
         </div>
     </footer>
+    <script>
+        let currentIndex = 0;
+        const images = document.querySelectorAll('.carousel-image');
+        const thumbnails = document.querySelectorAll('.thumbnail');
+        const totalImages = images.length;
+
+        function showImage(index) {
+            images[currentIndex].classList.remove('active');
+            thumbnails[currentIndex].classList.remove('active');
+            currentIndex = (index + totalImages) % totalImages;
+            images[currentIndex].classList.add('active');
+            thumbnails[currentIndex].classList.add('active');
+        }
+
+        function nextImage() {
+            showImage(currentIndex + 1);
+        }
+
+        function prevImage() {
+            showImage(currentIndex - 1);
+        }
+
+        // Suporte a gestos de toque (swipe)
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        const carousel = document.querySelector('.relative');
+        if (carousel) {
+            carousel.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+            });
+
+            carousel.addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                handleSwipe();
+            });
+        }
+
+        function handleSwipe() {
+            const swipeThreshold = 50; // Mínimo de pixels para considerar um swipe
+            if (touchStartX - touchEndX > swipeThreshold) {
+                nextImage();
+            }
+            if (touchEndX - touchStartX > swipeThreshold) {
+                prevImage();
+            }
+        }
+    </script>
 </body>
 </html>
