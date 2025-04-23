@@ -59,10 +59,15 @@ def init_db():
             description TEXT,
             price REAL NOT NULL,
             category TEXT,
-            photo_url TEXT,
-            photo_public_id TEXT,
             user_id INTEGER,
             FOREIGN KEY (user_id) REFERENCES users (id)
+        )''')
+        c.execute('''CREATE TABLE product_photos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER,
+            photo_url TEXT,
+            photo_public_id TEXT,
+            FOREIGN KEY (product_id) REFERENCES products (id)
         )''')
         c.execute('''CREATE TABLE cart (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,15 +83,17 @@ def init_db():
         conn.commit()
         conn.close()
     else:
-        # Adicionar colunas photo_url e photo_public_id se não existirem
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
+        # Adicionar tabela product_photos se não existir
         try:
-            c.execute('ALTER TABLE products ADD COLUMN photo_url TEXT')
-        except sqlite3.OperationalError:
-            pass
-        try:
-            c.execute('ALTER TABLE products ADD COLUMN photo_public_id TEXT')
+            c.execute('''CREATE TABLE product_photos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product_id INTEGER,
+                photo_url TEXT,
+                photo_public_id TEXT,
+                FOREIGN KEY (product_id) REFERENCES products (id)
+            )''')
         except sqlite3.OperationalError:
             pass
         # Adicionar tabela cart se não existir
@@ -116,8 +123,10 @@ def home():
     conn = sqlite3.connect(get_db_path())
     c = conn.cursor()
     
-    # Selecionar até 8 produtos para destaque
-    c.execute('SELECT id, title, description, price, category, photo_url FROM products LIMIT 8')
+    # Selecionar até 8 produtos com a primeira foto
+    c.execute('''SELECT p.id, p.title, p.description, p.price, p.category, 
+                        (SELECT photo_url FROM product_photos WHERE product_id = p.id LIMIT 1) as photo_url
+                 FROM products p LIMIT 8''')
     products = c.fetchall()
     
     conn.close()
@@ -135,23 +144,25 @@ def search():
     min_price = request.args.get('min_price', '')
     max_price = request.args.get('max_price', '')
     
-    query = 'SELECT id, title, description, price, category, photo_url FROM products WHERE 1=1'
+    query = '''SELECT p.id, p.title, p.description, p.price, p.category, 
+                      (SELECT photo_url FROM product_photos WHERE product_id = p.id LIMIT 1) as photo_url
+               FROM products p WHERE 1=1'''
     params = []
     
     if search_query:
-        query += ' AND (title LIKE ? OR description LIKE ?)'
+        query += ' AND (p.title LIKE ? OR p.description LIKE ?)'
         params.extend([f'%{search_query}%', f'%{search_query}%'])
     
     if category:
-        query += ' AND category = ?'
+        query += ' AND p.category = ?'
         params.append(category)
     
     if min_price:
-        query += ' AND price >= ?'
+        query += ' AND p.price >= ?'
         params.append(float(min_price))
     
     if max_price:
-        query += ' AND price <= ?'
+        query += ' AND p.price <= ?'
         params.append(float(max_price))
     
     c.execute(query, params)
@@ -165,6 +176,28 @@ def search():
     return render_template('search.html', products=products, categories=categories, 
                          search_query=search_query, category=category, 
                          min_price=min_price, max_price=max_price)
+
+# Página de detalhes do produto
+@app.route('/product/<int:id>')
+def product(id):
+    conn = sqlite3.connect(get_db_path())
+    c = conn.cursor()
+    
+    # Obter detalhes do produto
+    c.execute('SELECT id, title, description, price, category FROM products WHERE id = ?', (id,))
+    product = c.fetchone()
+    
+    if not product:
+        conn.close()
+        flash('Produto não encontrado!', 'error')
+        return redirect(url_for('home'))
+    
+    # Obter todas as fotos do produto
+    c.execute('SELECT photo_url, photo_public_id FROM product_photos WHERE product_id = ?', (id,))
+    photos = c.fetchall()
+    
+    conn.close()
+    return render_template('product.html', product=product, photos=photos)
 
 # Página de login
 @app.route('/login', methods=['GET', 'POST'])
@@ -227,21 +260,24 @@ def create_ad():
         price = float(request.form['price'])
         category = request.form['category']
         user_id = session['user_id']
-        photo_url = None
-        photo_public_id = None
         
-        # Processar upload de foto para Cloudinary
-        if 'photo' in request.files:
-            file = request.files['photo']
+        # Inserir produto
+        conn = sqlite3.connect(get_db_path())
+        c = conn.cursor()
+        c.execute('INSERT INTO products (title, description, price, category, user_id) VALUES (?, ?, ?, ?, ?)',
+                  (title, description, price, category, user_id))
+        product_id = c.lastrowid
+        
+        # Processar upload de até 5 fotos
+        files = request.files.getlist('photos')
+        for file in files[:5]:  # Limitar a 5 fotos
             if file and allowed_file(file.filename):
                 upload_result = cloudinary.uploader.upload(file, folder='ecommerce_eletro')
                 photo_url = upload_result['secure_url']
                 photo_public_id = upload_result['public_id']
+                c.execute('INSERT INTO product_photos (product_id, photo_url, photo_public_id) VALUES (?, ?, ?)',
+                          (product_id, photo_url, photo_public_id))
         
-        conn = sqlite3.connect(get_db_path())
-        c = conn.cursor()
-        c.execute('INSERT INTO products (title, description, price, category, photo_url, photo_public_id, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                  (title, description, price, category, photo_url, photo_public_id, user_id))
         conn.commit()
         conn.close()
         flash('Anúncio criado com sucesso!', 'success')
@@ -257,16 +293,19 @@ def delete_ad(id):
     
     conn = sqlite3.connect(get_db_path())
     c = conn.cursor()
-    c.execute('SELECT photo_public_id FROM products WHERE id = ?', (id,))
-    product = c.fetchone()
     
-    # Apagar foto do Cloudinary, se existir
-    if product and product[0]:
-        try:
-            cloudinary.uploader.destroy(product[0])
-        except:
-            pass
+    # Apagar fotos do Cloudinary
+    c.execute('SELECT photo_public_id FROM product_photos WHERE product_id = ?', (id,))
+    photos = c.fetchall()
+    for photo in photos:
+        if photo[0]:
+            try:
+                cloudinary.uploader.destroy(photo[0])
+            except:
+                pass
     
+    # Apagar fotos e produto
+    c.execute('DELETE FROM product_photos WHERE product_id = ?', (id,))
     c.execute('DELETE FROM products WHERE id = ?', (id,))
     conn.commit()
     conn.close()
@@ -298,7 +337,8 @@ def cart():
     
     conn = sqlite3.connect(get_db_path())
     c = conn.cursor()
-    c.execute('''SELECT c.id, p.title, p.description, p.price, p.category, p.photo_url
+    c.execute('''SELECT c.id, p.title, p.description, p.price, p.category, 
+                        (SELECT photo_url FROM product_photos WHERE product_id = p.id LIMIT 1) as photo_url
                  FROM cart c
                  JOIN products p ON c.product_id = p.id
                  WHERE c.user_id = ?''', (session['user_id'],))

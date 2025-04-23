@@ -55,14 +55,18 @@
             {% for item in cart_items %}
             <div class="flex items-center border-b py-4">
                 {% if item[5] %}
-                    <img src="{{ item[5] }}" alt="{{ item[1] }}"
-                         class="w-24 h-24 object-contain mr-4">
+                    <a href="{{ url_for('product', id=item[0]) }}">
+                        <img src="{{ item[5] }}" alt="{{ item[1] }}"
+                             class="w-24 h-24 object-contain mr-4">
+                    </a>
                 {% else %}
-                    <img src="{{ url_for('static', filename='uploads/placeholder.png') }}" alt="Sem imagem"
-                         class="w-24 h-24 object-contain mr-4">
+                    <a href="{{ url_for('product', id=item[0]) }}">
+                        <img src="{{ url_for('static', filename='uploads/placeholder.png') }}" alt="Sem imagem"
+                             class="w-24 h-24 object-contain mr-4">
+                    </a>
                 {% endif %}
                 <div class="flex-1">
-                    <h3 class="text-lg font-semibold">{{ item[1] }}</h3>
+                    <a href="{{ url_for('product', id=item[0]) }}" class="text-lg font-semibold hover:underline">{{ item[1] }}</a>
                     <p class="text-gray-600">R$ {{ "%.2f" % item[3] }}</p>
                 </div>
                 <a href="{{ url_for('remove_from_cart', cart_id=item[0]) }}"
