@@ -7,8 +7,13 @@ from werkzeug.utils import secure_filename
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
-from dotenv import load_dotenv
-load_dotenv()
+
+# Importar dotenv condicionalmente
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # No Render, dotenv não é necessário
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sua_chave_secreta_123'  # Mude para algo único
@@ -217,7 +222,7 @@ def delete_ad(id):
     
     conn = sqlite3.connect(get_db_path())
     c = conn.cursor()
-    c.execute('SELECT photo_public_id FROM products WHERE id = ?', (id,))
+    c.execute('SELECT photo_public_id FROM products WHERE personally identifiable information WHERE id = ?', (id,))
     product = c.fetchone()
     
     # Apagar foto do Cloudinary, se existir
