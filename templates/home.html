@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eletrônicos à Venda</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+    <header class="bg-blue-600 text-white p-4">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">Eletrônicos Tarcísio</h1>
+            <nav class="space-x-4">
+                <a href="{{ url_for('home') }}" class="hover:underline">Início</a>
+                {% if session.username %}
+                    <span>Olá, {{ session.username }}!</span>
+                    {% if session.is_admin %}
+                        <a href="{{ url_for('create_ad') }}" class="hover:underline">Criar Anúncio</a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}" class="hover:underline">Sair</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="hover:underline">Login</a>
+                    <a href="{{ url_for('register') }}" class="hover:underline">Cadastrar</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+    <main class="container mx-auto p-6">
+        <h2 class="text-3xl font-semibold mb-6 text-gray-800">Eletrônicos à Venda</h2>
+        {% for message in get_flashed_messages() %}
+            <p class="p-4 mb-4 rounded {% if 'success' in message %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                {{ message }}
+            </p>
+        {% endfor %}
+        <form method="GET" class="mb-6 flex flex-col sm:flex-row gap-4">
+            <input type="text" name="search" placeholder="Buscar por título ou descrição" value="{{ search_query }}"
+                   class="p-2 border rounded w-full sm:w-1/3">
+            <select name="category" class="p-2 border rounded">
+                <option value="">Todas as categorias</option>
+                {% for cat in categories %}
+                    <option value="{{ cat }}" {% if cat == category %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <input type="number" name="min_price" placeholder="Preço mín." value="{{ min_price }}" step="0.01"
+                   class="p-2 border rounded w-full sm:w-1/6">
+            <input type="number" name="max_price" placeholder="Preço máx." value="{{ max_price }}" step="0.01"
+                   class="p-2 border rounded w-full sm:w-1/6">
+            <button type="submit" class="p-2 bg-blue-600 text-white rounded hover:bg-blue-700">Filtrar</button>
+        </form>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for product in products %}
+            <div class="bg-white p-4 rounded-lg shadow-md">
+                {% if product[5] %}
+                    <img src="{{ url_for('static', filename=product[5]) }}" alt="{{ product[1] }}"
+                         class="w-full h-32 object-cover rounded mb-4">
+                {% else %}
+                    <img src="{{ url_for('static', filename='uploads/placeholder.png') }}" alt="Sem imagem"
+                         class="w-full h-32 object-cover rounded mb-4">
+                {% endif %}
+                <h3 class="text-xl font-semibold mb-2">{{ product[1] }}</h3>
+                <p class="text-gray-600 mb-2">{{ product[2] }}</p>
+                <p class="text-gray-600 mb-2">Categoria: {{ product[4] or 'Sem categoria' }}</p>
+                <p class="text-lg font-bold mb-2">R$ {{ "%.2f" % product[3] }}</p>
+                <a href="https://wa.me/5511999999999?text=Quero%20comprar%20{{ product[1] }}"
+                   class="inline-block p-2 bg-green-500 text-white rounded hover:bg-green-600">Contactar via WhatsApp</a>
+                {% if session.is_admin %}
+                    <a href="{{ url_for('delete_ad', id=product[0]) }}"
+                       onclick="return confirm('Tem certeza que deseja apagar?')"
+                       class="inline-block p-2 bg-red-500 text-white rounded hover:bg-red-600 mt-2">Apagar</a>
+                {% endif %}
+            </div>
+            {% else %}
+            <p class="text-gray-600">Nenhum produto disponível.</p>
+            {% endfor %}
+        </div>
+    </main>
+</body>
+</html>
