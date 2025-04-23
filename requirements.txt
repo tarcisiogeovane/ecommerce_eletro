@@ -5,3 +5,4 @@ werkzeug==2.3.7
 gunicorn==22.0.0
 cloudinary==1.40.0
 python-dotenv==1.0.1
+mercadopago==2.3.0

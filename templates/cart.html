@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carrinho</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 font-sans">
+    <header class="bg-blue-900 text-white sticky top-0 z-10 shadow-md">
+        <div class="container mx-auto p-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold">
+                <a href="{{ url_for('home') }}">EletroCommerce</a>
+            </h1>
+            <nav class="flex items-center space-x-4">
+                <a href="{{ url_for('home') }}" class="hover:underline">Início</a>
+                {% if session.username %}
+                    {% if session.is_admin %}
+                        <a href="{{ url_for('create_ad') }}" class="hover:underline">Criar Anúncio</a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}" class="hover:underline">Sair</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="hover:underline">Login</a>
+                    <a href="{{ url_for('register') }}" class="hover:underline">Cadastrar</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+    <main class="container mx-auto p-6">
+        <h2 class="text-3xl font-semibold mb-6 text-gray-800">Seu Carrinho</h2>
+        {% for message in get_flashed_messages() %}
+            <p class="p-4 mb-4 rounded {% if 'success' in message %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                {{ message }}
+            </p>
+        {% endfor %}
+        {% if cart_items %}
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            {% for item in cart_items %}
+            <div class="flex items-center border-b py-4">
+                {% if item[5] %}
+                    <img src="{{ item[5] }}" alt="{{ item[1] }}"
+                         class="w-24 h-24 object-cover rounded-md mr-4">
+                {% else %}
+                    <img src="{{ url_for('static', filename='uploads/placeholder.png') }}" alt="Sem imagem"
+                         class="w-24 h-24 object-cover rounded-md mr-4">
+                {% endif %}
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold">{{ item[1] }}</h3>
+                    <p class="text-gray-600">R$ {{ "%.2f" % item[3] }}</p>
+                </div>
+                <a href="{{ url_for('remove_from_cart', cart_id=item[0]) }}"
+                   class="p-2 bg-red-500 text-white rounded hover:bg-red-600">Remover</a>
+            </div>
+            {% endfor %}
+            <div class="mt-4 text-right">
+                <p class="text-xl font-bold">Total: R$ {{ "%.2f" % total }}</p>
+                <form action="{{ url_for('create_checkout') }}" method="POST">
+                    <button type="submit" class="mt-4 p-2 bg-blue-900 text-white rounded hover:bg-blue-800">
+                        Finalizar Compra
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-gray-600">Seu carrinho está vazio.</p>
+        {% endif %}
+        <a href="{{ url_for('home') }}" class="inline-block mt-4 text-blue-900 hover:underline">Continuar Comprando</a>
+    </main>
+    <footer class="bg-blue-900 text-white p-4">
+        <div class="container mx-auto text-center">
+            <p>&copy; 2025 EletroCommerce. Todos os direitos reservados.</p>
+            <p>Contato: <a href="https://wa.me/5584992186331" class="underline">WhatsApp</a> | Email: tarcisio.geovane@gmail.com</p>
+        </div>
+    </footer>
+</body>
+</html>

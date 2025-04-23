@@ -7,6 +7,7 @@ from werkzeug.utils import secure_filename
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
+import mercadopago
 
 # Importar dotenv condicionalmente
 try:
@@ -28,6 +29,9 @@ cloudinary.config(
     api_secret=os.environ.get('CLOUDINARY_API_SECRET', 'sua_api_secret'),
     secure=True
 )
+
+# Configurar Mercado Pago
+mercado_pago_sdk = mercadopago.SDK(os.environ.get('MERCADO_PAGO_ACCESS_TOKEN', 'seu_access_token'))
 
 # Função para obter caminho do banco de dados
 def get_db_path():
@@ -60,6 +64,13 @@ def init_db():
             user_id INTEGER,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )''')
+        c.execute('''CREATE TABLE cart (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            product_id INTEGER,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (product_id) REFERENCES products (id)
+        )''')
         # Criar usuário admin inicial
         hashed_pwd = bcrypt.hashpw('h3kq45jj'.encode('utf-8'), bcrypt.gensalt())
         c.execute('INSERT OR REPLACE INTO users (username, password, is_admin) VALUES (?, ?, 1)', 
@@ -76,6 +87,17 @@ def init_db():
             pass
         try:
             c.execute('ALTER TABLE products ADD COLUMN photo_public_id TEXT')
+        except sqlite3.OperationalError:
+            pass
+        # Adicionar tabela cart se não existir
+        try:
+            c.execute('''CREATE TABLE cart (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                product_id INTEGER,
+                FOREIGN KEY (user_id) REFERENCES users (id),
+                FOREIGN KEY (product_id) REFERENCES products (id)
+            )''')
         except sqlite3.OperationalError:
             pass
         # Garantir que tarcisio é admin
@@ -237,6 +259,100 @@ def delete_ad(id):
     conn.close()
     flash('Anúncio apagado com sucesso!', 'success')
     return redirect(url_for('home'))
+
+# Adicionar ao carrinho
+@app.route('/add_to_cart/<int:product_id>')
+def add_to_cart(product_id):
+    if not session.get('user_id'):
+        flash('Faça login para adicionar ao carrinho!', 'error')
+        return redirect(url_for('login'))
+    
+    conn = sqlite3.connect(get_db_path())
+    c = conn.cursor()
+    c.execute('INSERT INTO cart (user_id, product_id) VALUES (?, ?)', 
+              (session['user_id'], product_id))
+    conn.commit()
+    conn.close()
+    flash('Produto adicionado ao carrinho!', 'success')
+    return redirect(url_for('home'))
+
+# Visualizar carrinho
+@app.route('/cart')
+def cart():
+    if not session.get('user_id'):
+        flash('Faça login para ver o carrinho!', 'error')
+        return redirect(url_for('login'))
+    
+    conn = sqlite3.connect(get_db_path())
+    c = conn.cursor()
+    c.execute('''SELECT c.id, p.title, p.description, p.price, p.category, p.photo_url
+                 FROM cart c
+                 JOIN products p ON c.product_id = p.id
+                 WHERE c.user_id = ?''', (session['user_id'],))
+    cart_items = c.fetchall()
+    
+    total = sum(item[3] for item in cart_items)
+    
+    conn.close()
+    return render_template('cart.html', cart_items=cart_items, total=total)
+
+# Remover do carrinho
+@app.route('/remove_from_cart/<int:cart_id>')
+def remove_from_cart(cart_id):
+    if not session.get('user_id'):
+        flash('Faça login para gerenciar o carrinho!', 'error')
+        return redirect(url_for('login'))
+    
+    conn = sqlite3.connect(get_db_path())
+    c = conn.cursor()
+    c.execute('DELETE FROM cart WHERE id = ? AND user_id = ?', (cart_id, session['user_id']))
+    conn.commit()
+    conn.close()
+    flash('Produto removido do carrinho!', 'success')
+    return redirect(url_for('cart'))
+
+# Criar checkout com Mercado Pago
+@app.route('/create_checkout', methods=['POST'])
+def create_checkout():
+    if not session.get('user_id'):
+        flash('Faça login para finalizar a compra!', 'error')
+        return redirect(url_for('login'))
+    
+    conn = sqlite3.connect(get_db_path())
+    c = conn.cursor()
+    c.execute('''SELECT p.title, p.description, p.price
+                 FROM cart c
+                 JOIN products p ON c.product_id = p.id
+                 WHERE c.user_id = ?''', (session['user_id'],))
+    cart_items = c.fetchall()
+    
+    if not cart_items:
+        flash('Seu carrinho está vazio!', 'error')
+        return redirect(url_for('cart'))
+    
+    # Criar preferência de pagamento
+    preference_data = {
+        "items": [
+            {
+                "title": item[0],
+                "quantity": 1,
+                "unit_price": float(item[2]),
+                "description": item[1]
+            } for item in cart_items
+        ],
+        "back_urls": {
+            "success": url_for('home', _external=True),
+            "failure": url_for('cart', _external=True),
+            "pending": url_for('cart', _external=True)
+        },
+        "auto_return": "approved"
+    }
+    
+    preference_response = mercado_pago_sdk.preference().create(preference_data)
+    preference = preference_response["response"]
+    
+    conn.close()
+    return redirect(preference["init_point"])
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
