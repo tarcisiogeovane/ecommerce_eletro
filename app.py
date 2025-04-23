@@ -222,7 +222,7 @@ def delete_ad(id):
     
     conn = sqlite3.connect(get_db_path())
     c = conn.cursor()
-    c.execute('SELECT photo_public_id FROM products WHERE personally identifiable information WHERE id = ?', (id,))
+    c.execute('SELECT photo_public_id FROM products WHERE id = ?', (id,))
     product = c.fetchone()
     
     # Apagar foto do Cloudinary, se existir
