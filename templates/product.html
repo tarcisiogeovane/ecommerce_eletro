@@ -16,6 +16,10 @@
         .thumbnail.active { border-color: #f0c14b; }
         .carousel-button { background-color: rgba(0, 0, 0, 0.5); }
         .carousel-button:hover { background-color: rgba(0, 0, 0, 0.7); }
+        .zoom-container { position: relative; overflow: hidden; }
+        .zoom-lens { position: absolute; width: 100px; height: 100px; border: 1px solid #f0c14b; background: rgba(255, 255, 255, 0.3); display: none; cursor: none; }
+        .zoom-result { position: absolute; top: 0; left: 100%; width: 400px; height: 400px; border: 1px solid #ccc; background: #fff; display: none; overflow: hidden; }
+        .zoom-result img { position: absolute; }
     </style>
 </head>
 <body class="bg-gray-100 font-sans">
@@ -27,7 +31,7 @@
             <form method="GET" action="{{ url_for('search') }}" class="flex-1 mx-4 my-2 sm:my-0">
                 <div class="flex">
                     <input type="text" name="search" placeholder="Buscar em EletroCommerce" value=""
-                           class="w-full p-2 rounded-l-md border-none focus:ring-2 focus:ring-orange-400">
+                           class="w-full p-2 rounded-l-md border-none text-gray-900 bg-white focus:ring-2 focus:ring-orange-400">
                     <button type="submit" class="p-2 bg-orange-400 text-gray-800 rounded-r-md hover:bg-orange-500">
                         🔍
                     </button>
@@ -59,25 +63,30 @@
             <!-- Galeria de Fotos (Carrossel) -->
             <div class="w-full lg:w-1/2 mb-4 lg:mb-0 lg:mr-6 relative">
                 {% if photos %}
-                    <div class="relative">
+                    <div class="zoom-container relative">
                         {% for photo in photos %}
                             <img src="{{ photo[0] }}" alt="{{ product[1] }}"
                                  class="w-full h-96 object-contain carousel-image {% if loop.first %}active{% endif %}"
                                  id="carousel-image-{{ loop.index0 }}">
                         {% endfor %}
+                        <div class="zoom-lens"></div>
+                        <div class="zoom-result">
+                            <img src="{{ photos[0][0] }}" id="zoom-image">
+                        </div>
                         <button class="carousel-button absolute left-0 top-1/2 transform -translate-y-1/2 p-2 text-white rounded-full"
                                 onclick="prevImage()">
-                            &larr;
+                            ←
                         </button>
                         <button class="carousel-button absolute right-0 top-1/2 transform -translate-y-1/2 p-2 text-white rounded-full"
                                 onclick="nextImage()">
-                            &rarr;
+                            →
                         </button>
                     </div>
                     <div class="flex space-x-2 mt-4 overflow-x-auto">
                         {% for photo in photos %}
                             <img src="{{ photo[0] }}" alt="{{ product[1] }}"
                                  class="w-20 h-20 object-contain border thumbnail {% if loop.first %}active{% endif %}"
+                                 data-index="{{ loop.index0 }}"
                                  onclick="showImage({loop,index0})">
                         {% endfor %}
                     </div>
@@ -122,6 +131,9 @@
         const images = document.querySelectorAll('.carousel-image');
         const thumbnails = document.querySelectorAll('.thumbnail');
         const totalImages = images.length;
+        const zoomLens = document.querySelector('.zoom-lens');
+        const zoomResult = document.querySelector('.zoom-result');
+        const zoomImage = document.querySelector('#zoom-image');
 
         function showImage(index) {
             images[currentIndex].classList.remove('active');
@@ -129,6 +141,7 @@
             currentIndex = (index + totalImages) % totalImages;
             images[currentIndex].classList.add('active');
             thumbnails[currentIndex].classList.add('active');
+            zoomImage.src = images[currentIndex].src; // Atualiza imagem do zoom
         }
 
         function nextImage() {
@@ -139,11 +152,27 @@
             showImage(currentIndex - 1);
         }
 
+        // Suporte a cliques nas miniaturas
+        thumbnails.forEach(thumbnail => {
+            thumbnail.addEventListener('click', () => {
+                const index = parseInt(thumbnail.getAttribute('data-index'));
+                showImage(index);
+            });
+        });
+
+        // Suporte a teclas do teclado
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight') {
+                nextImage();
+            } else if (e.key === 'ArrowLeft') {
+                prevImage();
+            }
+        });
+
         // Suporte a gestos de toque (swipe)
         let touchStartX = 0;
         let touchEndX = 0;
-
-        const carousel = document.querySelector('.relative');
+        const carousel = document.querySelector('.zoom-container');
         if (carousel) {
             carousel.addEventListener('touchstart', (e) => {
                 touchStartX = e.changedTouches[0].screenX;
@@ -156,13 +185,78 @@
         }
 
         function handleSwipe() {
-            const swipeThreshold = 50; // Mínimo de pixels para considerar um swipe
+            const swipeThreshold = 50;
             if (touchStartX - touchEndX > swipeThreshold) {
                 nextImage();
             }
             if (touchEndX - touchStartX > swipeThreshold) {
                 prevImage();
             }
+        }
+
+        // Zoom na imagem
+        if (carousel) {
+            carousel.addEventListener('mousemove', (e) => {
+                const rect = carousel.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                // Mostrar lente e resultado do zoom
+                zoomLens.style.display = 'block';
+                zoomResult.style.display = 'block';
+
+                // Posicionar a lente
+                let lensX = x - zoomLens.offsetWidth / 2;
+                let lensY = y - zoomLens.offsetHeight / 2;
+
+                // Limitar a lente dentro da imagem
+                lensX = Math.max(0, Math.min(lensX, carousel.offsetWidth - zoomLens.offsetWidth));
+                lensY = Math.max(0, Math.min(lensY, carousel.offsetHeight - zoomLens.offsetHeight));
+
+                zoomLens.style.left = `${lensX}px`;
+                zoomLens.style.top = `${lensY}px`;
+
+                // Calcular a posição da imagem ampliada
+                const ratioX = zoomImage.offsetWidth / zoomLens.offsetWidth;
+                const ratioY = zoomImage.offsetHeight / zoomLens.offsetHeight;
+                zoomImage.style.left = `-${lensX * ratioX}px`;
+                zoomImage.style.top = `-${lensY * ratioY}px`;
+            });
+
+            carousel.addEventListener('mouseleave', () => {
+                zoomLens.style.display = 'none';
+                zoomResult.style.display = 'none';
+            });
+
+            // Zoom com toque em dispositivos móveis
+            carousel.addEventListener('touchstart', (e) => {
+                const touch = e.touches[0];
+                const rect = carousel.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+
+                zoomLens.style.display = 'block';
+                zoomResult.style.display = 'block';
+
+                let lensX = x - zoomLens.offsetWidth / 2;
+                let lensY = y - zoomLens.offsetHeight / 2;
+
+                lensX = Math.max(0, Math.min(lensX, carousel.offsetWidth - zoomLens.offsetWidth));
+                lensY = Math.max(0, Math.min(lensY, carousel.offsetHeight - zoomLens.offsetHeight));
+
+                zoomLens.style.left = `${lensX}px`;
+                zoomLens.style.top = `${lensY}px`;
+
+                const ratioX = zoomImage.offsetWidth / zoomLens.offsetWidth;
+                const ratioY = zoomImage.offsetHeight / zoomLens.offsetHeight;
+                zoomImage.style.left = `-${lensX * ratioX}px`;
+                zoomImage.style.top = `-${lensY * ratioY}px`;
+            });
+
+            carousel.addEventListener('touchend', () => {
+                zoomLens.style.display = 'none';
+                zoomResult.style.display = 'none';
+            });
         }
     </script>
 </body>

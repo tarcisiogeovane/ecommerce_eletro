@@ -21,7 +21,7 @@
             <form method="GET" action="{{ url_for('search') }}" class="flex-1 mx-4 my-2 sm:my-0">
                 <div class="flex">
                     <input type="text" name="search" placeholder="Buscar em EletroCommerce" value="{{ search_query }}"
-                           class="w-full p-2 rounded-l-md border-none focus:ring-2 focus:ring-orange-400">
+                           class="w-full p-2 rounded-l-md border-none text-gray-900 bg-white focus:ring-2 focus:ring-orange-400">
                     <button type="submit" class="p-2 bg-orange-400 text-gray-800 rounded-r-md hover:bg-orange-500">
                         🔍
                     </button>
@@ -76,8 +76,8 @@
             <h2 class="text-2xl font-semibold mb-4">Resultados da Busca</h2>
             {% for message in get_flashed_messages() %}
                 <p class="p-4 mb-4 rounded {% if 'success' in message %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
-                    {{ message }}
-                </p>
+                {{ message }}
+            </p>
             {% endfor %}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {% for product in products %}
