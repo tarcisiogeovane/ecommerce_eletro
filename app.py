@@ -4,17 +4,25 @@ import sqlite3
 import os
 import bcrypt
 from werkzeug.utils import secure_filename
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sua_chave_secreta_123'  # Mude para algo único
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg'}
 Session(app)
 
-# Criar pasta para uploads
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
+# Configurar Cloudinary
+cloudinary.config(
+    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME', 'seu_cloud_name'),
+    api_key=os.environ.get('CLOUDINARY_API_KEY', 'sua_api_key'),
+    api_secret=os.environ.get('CLOUDINARY_API_SECRET', 'sua_api_secret'),
+    secure=True
+)
 
 # Função para obter caminho do banco de dados
 def get_db_path():
@@ -42,7 +50,8 @@ def init_db():
             description TEXT,
             price REAL NOT NULL,
             category TEXT,
-            photo_path TEXT,
+            photo_url TEXT,
+            photo_public_id TEXT,
             user_id INTEGER,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )''')
@@ -53,15 +62,15 @@ def init_db():
         conn.commit()
         conn.close()
     else:
-        # Adicionar colunas category e photo_path se não existirem
+        # Adicionar colunas photo_url e photo_public_id se não existirem
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
         try:
-            c.execute('ALTER TABLE products ADD COLUMN category TEXT')
+            c.execute('ALTER TABLE products ADD COLUMN photo_url TEXT')
         except sqlite3.OperationalError:
             pass
         try:
-            c.execute('ALTER TABLE products ADD COLUMN photo_path TEXT')
+            c.execute('ALTER TABLE products ADD COLUMN photo_public_id TEXT')
         except sqlite3.OperationalError:
             pass
         # Garantir que tarcisio é admin
@@ -86,7 +95,7 @@ def home():
     min_price = request.args.get('min_price', '')
     max_price = request.args.get('max_price', '')
     
-    query = 'SELECT id, title, description, price, category, photo_path FROM products WHERE 1=1'
+    query = 'SELECT id, title, description, price, category, photo_url FROM products WHERE 1=1'
     params = []
     
     if search_query:
@@ -178,21 +187,21 @@ def create_ad():
         price = float(request.form['price'])
         category = request.form['category']
         user_id = session['user_id']
-        photo_path = None
+        photo_url = None
+        photo_public_id = None
         
-        # Processar upload de foto
+        # Processar upload de foto para Cloudinary
         if 'photo' in request.files:
             file = request.files['photo']
             if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                photo_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(photo_path)
-                photo_path = f'uploads/{filename}'
+                upload_result = cloudinary.uploader.upload(file, folder='ecommerce_eletro')
+                photo_url = upload_result['secure_url']
+                photo_public_id = upload_result['public_id']
         
         conn = sqlite3.connect(get_db_path())
         c = conn.cursor()
-        c.execute('INSERT INTO products (title, description, price, category, photo_path, user_id) VALUES (?, ?, ?, ?, ?, ?)',
-                  (title, description, price, category, photo_path, user_id))
+        c.execute('INSERT INTO products (title, description, price, category, photo_url, photo_public_id, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                  (title, description, price, category, photo_url, photo_public_id, user_id))
         conn.commit()
         conn.close()
         flash('Anúncio criado com sucesso!', 'success')
@@ -208,14 +217,15 @@ def delete_ad(id):
     
     conn = sqlite3.connect(get_db_path())
     c = conn.cursor()
-    c.execute('SELECT photo_path FROM products WHERE id = ?', (id,))
+    c.execute('SELECT photo_public_id FROM products WHERE id = ?', (id,))
     product = c.fetchone()
     
-    # Apagar foto do sistema de arquivos, se existir
+    # Apagar foto do Cloudinary, se existir
     if product and product[0]:
-        photo_path = os.path.join('static', product[0])
-        if os.path.exists(photo_path):
-            os.remove(photo_path)
+        try:
+            cloudinary.uploader.destroy(product[0])
+        except:
+            pass
     
     c.execute('DELETE FROM products WHERE id = ?', (id,))
     conn.commit()
