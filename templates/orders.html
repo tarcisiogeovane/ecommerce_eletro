@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cadastro - EletroCommerce</title>
+    <title>Meus Pedidos - EletroCommerce</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .amazon-orange { background-color: #f0c14b; }
@@ -28,37 +28,27 @@
                 </div>
             </form>
             <nav class="flex items-center space-x-4">
-                <a href="{{ url_for('login') }}" class="hover:underline text-sm">Login</a>
+                {% if session.username %}
+                    <span class="text-sm">Olá, {{ session.username }}</span>
+                    <a href="{{ url_for('cart') }}" class="hover:underline text-sm">Carrinho</a>
+                    {% if session.is_admin %}
+                        <a href="{{ url_for('create_ad') }}" class="hover:underline text-sm">Criar Anúncio</a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}" class="hover:underline text-sm">Sair</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="hover:underline text-sm">Login</a>
+                    <a href="{{ url_for('register') }}" class="hover:underline text-sm">Cadastrar</a>
+                {% endif %}
             </nav>
         </div>
     </header>
     <main class="container mx-auto p-4">
-        <div class="bg-white p-6 rounded-lg shadow-sm max-w-md mx-auto">
-            <h2 class="text-2xl font-semibold mb-4 text-center">Cadastro</h2>
-            {% for message in get_flashed_messages() %}
-                <p class="p-4 mb-4 rounded {% if 'success' in message %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
-                    {{ message }}
-                </p>
-            {% endfor %}
-            <form method="POST">
-                <div class="mb-4">
-                    <label for="username" class="block text-gray-700 font-medium mb-2">Usuário</label>
-                    <input type="text" name="username" id="username" placeholder="Usuário" required
-                           class="w-full p-2 border rounded focus:ring-2 focus:ring-orange-400">
-                </div>
-                <div class="mb-4">
-                    <label for="password" class="block text-gray-700 font-medium mb-2">Senha</label>
-                    <input type="password" name="password" id="password" placeholder="Senha" required
-                           class="w-full p-2 border rounded focus:ring-2 focus:ring-orange-400">
-                </div>
-                <button type="submit" class="w-full p-2 amazon-orange text-gray-800 rounded hover:bg-orange-500">
-                    Cadastrar
-                </button>
-            </form>
-            <div class="mt-4 text-center">
-                <a href="{{ url_for('login') }}" class="text-blue-600 hover:underline">Já tem conta? Faça login</a>
-            </div>
-        </div>
+        <h2 class="text-2xl font-semibold mb-4">Meus Pedidos</h2>
+        <p class="text-gray-600">Funcionalidade de pedidos em desenvolvimento. Entre em contato pelo WhatsApp para acompanhar suas compras!</p>
+        <a href="https://wa.me/5511999999999" class="inline-block mt-4 p-2 bg-green-500 text-white rounded hover:bg-green-600">
+            Fale conosco
+        </a>
+        <a href="{{ url_for('home') }}" class="inline-block mt-4 ml-4 text-blue-600 hover:underline">Voltar</a>
     </main>
     <footer class="amazon-blue-light text-white p-4">
         <div class="container mx-auto text-center">

@@ -110,9 +110,22 @@ def init_db():
 # Inicializar o banco
 init_db()
 
-# Página inicial (catálogo com busca e filtros)
-@app.route('/', methods=['GET', 'POST'])
+# Página inicial (produtos em destaque)
+@app.route('/', methods=['GET'])
 def home():
+    conn = sqlite3.connect(get_db_path())
+    c = conn.cursor()
+    
+    # Selecionar até 8 produtos para destaque
+    c.execute('SELECT id, title, description, price, category, photo_url FROM products LIMIT 8')
+    products = c.fetchall()
+    
+    conn.close()
+    return render_template('home.html', products=products)
+
+# Página de busca
+@app.route('/search', methods=['GET'])
+def search():
     conn = sqlite3.connect(get_db_path())
     c = conn.cursor()
     
@@ -149,7 +162,7 @@ def home():
     categories = [row[0] for row in c.fetchall()]
     
     conn.close()
-    return render_template('home.html', products=products, categories=categories, 
+    return render_template('search.html', products=products, categories=categories, 
                          search_query=search_query, category=category, 
                          min_price=min_price, max_price=max_price)
 
@@ -274,7 +287,7 @@ def add_to_cart(product_id):
     conn.commit()
     conn.close()
     flash('Produto adicionado ao carrinho!', 'success')
-    return redirect(url_for('home'))
+    return redirect(request.referrer or url_for('home'))
 
 # Visualizar carrinho
 @app.route('/cart')
@@ -353,6 +366,14 @@ def create_checkout():
     
     conn.close()
     return redirect(preference["init_point"])
+
+# Página de pedidos (placeholder)
+@app.route('/orders')
+def orders():
+    if not session.get('user_id'):
+        flash('Faça login para ver seus pedidos!', 'error')
+        return redirect(url_for('login'))
+    return render_template('orders.html')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

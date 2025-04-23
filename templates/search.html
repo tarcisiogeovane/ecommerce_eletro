@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EletroCommerce</title>
+    <title>Resultados da Busca - EletroCommerce</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .amazon-orange { background-color: #f0c14b; }
@@ -20,7 +20,7 @@
             </a>
             <form method="GET" action="{{ url_for('search') }}" class="flex-1 mx-4 my-2 sm:my-0">
                 <div class="flex">
-                    <input type="text" name="search" placeholder="Buscar em EletroCommerce" value=""
+                    <input type="text" name="search" placeholder="Buscar em EletroCommerce" value="{{ search_query }}"
                            class="w-full p-2 rounded-l-md border-none focus:ring-2 focus:ring-orange-400">
                     <button type="submit" class="p-2 bg-orange-400 text-gray-800 rounded-r-md hover:bg-orange-500">
                         🔍
@@ -43,10 +43,43 @@
             </nav>
         </div>
     </header>
-    <main class="container mx-auto p-4">
-        <div class="bg-white p-6 rounded-lg shadow-sm mb-6">
-            <h2 class="text-2xl font-semibold mb-4">Produtos em Destaque</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <main class="container mx-auto p-4 flex flex-col lg:flex-row">
+        <aside class="w-full lg:w-1/4 bg-white p-4 rounded-lg shadow-sm mb-4 lg:mb-0 lg:mr-4">
+            <h3 class="text-lg font-semibold mb-4">Filtros</h3>
+            <form method="GET" action="{{ url_for('search') }}">
+                <input type="hidden" name="search" value="{{ search_query }}">
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2">Categoria</label>
+                    <select name="category" class="w-full p-2 border rounded">
+                        <option value="">Todas</option>
+                        {% for cat in categories %}
+                            <option value="{{ cat }}" {% if cat == category %}selected{% endif %}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2">Preço Mínimo</label>
+                    <input type="number" name="min_price" value="{{ min_price }}" step="0.01"
+                           class="w-full p-2 border rounded">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2">Preço Máximo</label>
+                    <input type="number" name="max_price" value="{{ max_price }}" step="0.01"
+                           class="w-full p-2 border rounded">
+                </div>
+                <button type="submit" class="w-full p-2 amazon-orange text-gray-800 rounded hover:bg-orange-500">
+                    Aplicar Filtros
+                </button>
+            </form>
+        </aside>
+        <div class="flex-1">
+            <h2 class="text-2xl font-semibold mb-4">Resultados da Busca</h2>
+            {% for message in get_flashed_messages() %}
+                <p class="p-4 mb-4 rounded {% if 'success' in message %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                    {{ message }}
+                </p>
+            {% endfor %}
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {% for product in products %}
                 <div class="bg-white p-4 rounded-lg border hover:shadow-md transition">
                     {% if product[5] %}
@@ -74,15 +107,10 @@
                     {% endif %}
                 </div>
                 {% else %}
-                <p class="text-gray-600">Nenhum produto disponível.</p>
+                <p class="text-gray-600">Nenhum produto encontrado.</p>
                 {% endfor %}
             </div>
         </div>
-        {% for message in get_flashed_messages() %}
-            <p class="p-4 mb-4 rounded {% if 'success' in message %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
-                {{ message }}
-            </p>
-        {% endfor %}
     </main>
     <footer class="amazon-blue-light text-white p-4">
         <div class="container mx-auto text-center">
