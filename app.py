@@ -16,14 +16,19 @@ Session(app)
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
+# Função para obter caminho do banco de dados
+def get_db_path():
+    return os.path.join(os.path.dirname(__file__), 'database.db')
+
 # Verificar extensão do arquivo
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 # Configurar banco de dados SQLite
 def init_db():
-    if not os.path.exists('database.db'):
-        conn = sqlite3.connect('database.db')
+    db_path = get_db_path()
+    if not os.path.exists(db_path):
+        conn = sqlite3.connect(db_path)
         c = conn.cursor()
         c.execute('''CREATE TABLE users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,11 +46,15 @@ def init_db():
             user_id INTEGER,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )''')
+        # Criar usuário admin inicial
+        hashed_pwd = bcrypt.hashpw('h3kq45jj'.encode('utf-8'), bcrypt.gensalt())
+        c.execute('INSERT OR REPLACE INTO users (username, password, is_admin) VALUES (?, ?, 1)', 
+                  ('tarcisio', hashed_pwd))
         conn.commit()
         conn.close()
     else:
         # Adicionar colunas category e photo_path se não existirem
-        conn = sqlite3.connect('database.db')
+        conn = sqlite3.connect(db_path)
         c = conn.cursor()
         try:
             c.execute('ALTER TABLE products ADD COLUMN category TEXT')
@@ -55,7 +64,7 @@ def init_db():
             c.execute('ALTER TABLE products ADD COLUMN photo_path TEXT')
         except sqlite3.OperationalError:
             pass
-        # Marcar tarcisio como admin (caso não esteja)
+        # Garantir que tarcisio é admin
         hashed_pwd = bcrypt.hashpw('h3kq45jj'.encode('utf-8'), bcrypt.gensalt())
         c.execute('UPDATE users SET is_admin = 1, password = ? WHERE username = ?', 
                   (hashed_pwd, 'tarcisio'))
@@ -68,7 +77,7 @@ init_db()
 # Página inicial (catálogo com busca e filtros)
 @app.route('/', methods=['GET', 'POST'])
 def home():
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(get_db_path())
     c = conn.cursor()
     
     # Parâmetros de busca e filtros
@@ -114,7 +123,7 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        conn = sqlite3.connect('database.db')
+        conn = sqlite3.connect(get_db_path())
         c = conn.cursor()
         c.execute('SELECT id, password, is_admin FROM users WHERE username = ?', (username,))
         user = c.fetchone()
@@ -144,7 +153,7 @@ def register():
         password = request.form['password']
         hashed_pwd = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         try:
-            conn = sqlite3.connect('database.db')
+            conn = sqlite3.connect(get_db_path())
             c = conn.cursor()
             c.execute('INSERT INTO users (username, password, is_admin) VALUES (?, ?, 0)', 
                       (username, hashed_pwd))
@@ -180,7 +189,7 @@ def create_ad():
                 file.save(photo_path)
                 photo_path = f'uploads/{filename}'
         
-        conn = sqlite3.connect('database.db')
+        conn = sqlite3.connect(get_db_path())
         c = conn.cursor()
         c.execute('INSERT INTO products (title, description, price, category, photo_path, user_id) VALUES (?, ?, ?, ?, ?, ?)',
                   (title, description, price, category, photo_path, user_id))
@@ -197,7 +206,7 @@ def delete_ad(id):
         flash('Apenas administradores podem apagar anúncios!', 'error')
         return redirect(url_for('login'))
     
-    conn = sqlite3.connect('database.db')
+    conn = sqlite3.connect(get_db_path())
     c = conn.cursor()
     c.execute('SELECT photo_path FROM products WHERE id = ?', (id,))
     product = c.fetchone()
@@ -213,9 +222,6 @@ def delete_ad(id):
     conn.close()
     flash('Anúncio apagado com sucesso!', 'success')
     return redirect(url_for('home'))
-
-if __name__ == '__main__':
-    app.run(debug=True)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
