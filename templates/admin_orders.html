@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedidos - EletroCommerce</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .amazon-orange { background-color: #f0c14b; }
+        .amazon-orange:hover { background-color: #e0a83f; }
+        .amazon-blue { background-color: #131921; }
+        .amazon-blue-light { background-color: #232f3e; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    <header class="amazon-blue text-white sticky top-0 z-10">
+        <div class="container mx-auto p-2 flex flex-col sm:flex-row items-center justify-between">
+            <a href="{{ url_for('home') }}" class="text-2xl font-bold">
+                <span class="text-white">Eletro</span><span class="text-orange-400">Commerce</span>
+            </a>
+            <form method="GET" action="{{ url_for('search') }}" class="flex-1 mx-4 my-2 sm:my-0">
+                <div class="flex">
+                    <input type="text" name="search" placeholder="Buscar em EletroCommerce" value=""
+                           class="w-full p-2 rounded-l-md border-none text-gray-900 bg-white focus:ring-2 focus:ring-orange-400">
+                    <button type="submit" class="p-2 bg-orange-400 text-gray-800 rounded-r-md hover:bg-orange-500">
+                        🔍
+                    </button>
+                </div>
+            </form>
+            <nav class="flex items-center space-x-4">
+                {% if session.username %}
+                    <span class="text-sm">Olá, {{ session.username }}</span>
+                    <a href="{{ url_for('orders') }}" class="hover:underline text-sm">Pedidos</a>
+                    <a href="{{ url_for('cart') }}" class="hover:underline text-sm">Carrinho</a>
+                    {% if session.is_admin %}
+                        <a href="{{ url_for('create_ad') }}" class="hover:underline text-sm">Criar Anúncio</a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}" class="hover:underline text-sm">Sair</a>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="hover:underline text-sm">Login</a>
+                    <a href="{{ url_for('register') }}" class="hover:underline text-sm">Cadastrar</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+    <main class="container mx-auto p-4">
+        <h2 class="text-2xl font-semibold mb-4">Gerenciar Pedidos</h2>
+        {% for message in get_flashed_messages() %}
+            <p class="p-4 mb-4 rounded {% if 'success' in message %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                {{ message }}
+            </p>
+        {% endfor %}
+        <div class="bg-white p-6 rounded-lg shadow-sm">
+            {% if orders %}
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="border-b">
+                            <th class="p-2">ID</th>
+                            <th class="p-2">Cliente</th>
+                            <th class="p-2">Produto</th>
+                            <th class="p-2">Status</th>
+                            <th class="p-2">Cód. Rastreamento</th>
+                            <th class="p-2">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr class="border-b">
+                            <td class="p-2">{{ order[0] }}</td>
+                            <td class="p-2">{{ order[1] }}</td>
+                            <td class="p-2">{{ order[2] }}</td>
+                            <td class="p-2">{{ order[3] }}</td>
+                            <td class="p-2">{{ order[4] or 'N/A' }}</td>
+                            <td class="p-2">
+                                <form action="{{ url_for('update_order', order_id=order[0]) }}" method="POST">
+                                    <select name="status" class="p-1 border rounded">
+                                        <option value="Pendente" {% if order[3] == 'Pendente' %}selected{% endif %}>Pendente</option>
+                                        <option value="Enviado" {% if order[3] == 'Enviado' %}selected{% endif %}>Enviado</option>
+                                        <option value="Entregue" {% if order[3] == 'Entregue' %}selected{% endif %}>Entregue</option>
+                                    </select>
+                                    <input type="text" name="tracking_code" placeholder="Cód. Rastreamento" value="{{ order[4] or '' }}"
+                                           class="p-1 border rounded">
+                                    <button type="submit" class="p-1 bg-orange-400 text-gray-800 rounded hover:bg-orange-500">
+                                        Atualizar
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-gray-600">Nenhum pedido encontrado.</p>
+            {% endif %}
+        </div>
+        <a href="{{ url_for('home') }}" class="inline-block mt-4 text-blue-600 hover:underline">Voltar</a>
+    </main>
+    <footer class="amazon-blue-light text-white p-4">
+        <div class="container mx-auto text-center">
+            <p>© 2025 EletroCommerce. Todos os direitos reservados.</p>
+            <p>Contato: <a href="https://wa.me/5584992186331" class="underline">WhatsApp</a> | Email: tarcisio.geovane@gmail.com</p>
+        </div>
+    </footer>
+</body>
+</html>

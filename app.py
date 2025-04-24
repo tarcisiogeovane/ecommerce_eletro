@@ -47,6 +47,16 @@ def init_db():
     if not os.path.exists(db_path):
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            product_id INTEGER,
+            status TEXT,
+            tracking_code TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (product_id) REFERENCES products (id)
+        )''')
         c.execute('''CREATE TABLE users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
@@ -367,21 +377,37 @@ def remove_from_cart(cart_id):
 # Criar checkout com Mercado Pago
 @app.route('/create_checkout', methods=['POST'])
 def create_checkout():
-    if not session.get('user_id'):
+    if not session.get('username'):
         flash('Faça login para finalizar a compra!', 'error')
         return redirect(url_for('login'))
-    
     conn = sqlite3.connect(get_db_path())
     c = conn.cursor()
-    c.execute('''SELECT p.title, p.description, p.price
-                 FROM cart c
-                 JOIN products p ON c.product_id = p.id
-                 WHERE c.user_id = ?''', (session['user_id'],))
+    c.execute('SELECT user_id FROM users WHERE username = ?', (session['username'],))
+    user_id = c.fetchone()[0]
+    c.execute('SELECT product_id, price FROM cart WHERE user_id = ?', (user_id,))
     cart_items = c.fetchall()
-    
     if not cart_items:
         flash('Seu carrinho está vazio!', 'error')
         return redirect(url_for('cart'))
+    total = sum(item[1] for item in cart_items)
+    for item in cart_items:
+        c.execute('INSERT INTO orders (user_id, product_id, status) VALUES (?, ?, ?)',
+                  (user_id, item[0], 'Pendente'))
+    c.execute('DELETE FROM cart WHERE user_id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+    preference_data = {
+        "items": [{"title": "Compra EletroCommerce", "quantity": 1, "unit_price": total}],
+        "back_urls": {
+            "success": url_for('home', _external=True),
+            "failure": url_for('cart', _external=True),
+            "pending": url_for('cart', _external=True)
+        },
+        "auto_return": "approved"
+    }
+    preference = mp_sdk.preference().create(preference_data)
+    flash('Compra finalizada! Você receberá detalhes por WhatsApp.', 'success')
+    return redirect(preference['response']['init_point'])
     
     # Criar preferência de pagamento
     preference_data = {
@@ -414,6 +440,37 @@ def orders():
         flash('Faça login para ver seus pedidos!', 'error')
         return redirect(url_for('login'))
     return render_template('orders.html')
+
+@app.route('/admin/orders')
+def admin_orders():
+    if not session.get('is_admin'):
+        flash('Apenas administradores podem acessar!', 'error')
+        return redirect(url_for('home'))
+    conn = sqlite3.connect(get_db_path())
+    c = conn.cursor()
+    c.execute('''SELECT o.id, u.username, p.title, o.status, o.tracking_code
+                 FROM orders o
+                 JOIN users u ON o.user_id = u.id
+                 JOIN products p ON o.product_id = p.id''')
+    orders = c.fetchall()
+    conn.close()
+    return render_template('admin_orders.html', orders=orders)
+
+@app.route('/admin/update_order/<int:order_id>', methods=['POST'])
+def update_order(order_id):
+    if not session.get('is_admin'):
+        flash('Apenas administradores podem acessar!', 'error')
+        return redirect(url_for('home'))
+    status = request.form['status']
+    tracking_code = request.form.get('tracking_code', '')
+    conn = sqlite3.connect(get_db_path())
+    c = conn.cursor()
+    c.execute('UPDATE orders SET status = ?, tracking_code = ? WHERE id = ?',
+              (status, tracking_code, order_id))
+    conn.commit()
+    conn.close()
+    flash('Pedido atualizado!', 'success')
+    return redirect(url_for('admin_orders'))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
